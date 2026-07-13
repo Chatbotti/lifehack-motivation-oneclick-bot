@@ -27,6 +27,22 @@ def require_env(name: str) -> str:
     return value
 
 
+def load_chat_ids() -> list[str]:
+    """Read one or more comma-separated Telegram chat IDs."""
+    raw = require_env("TELEGRAM_CHAT_ID")
+    chat_ids: list[str] = []
+
+    for item in raw.split(","):
+        chat_id = item.strip()
+        if chat_id and chat_id not in chat_ids:
+            chat_ids.append(chat_id)
+
+    if not chat_ids:
+        raise RuntimeError("TELEGRAM_CHAT_ID contains no usable chat IDs.")
+
+    return chat_ids
+
+
 def load_articles() -> list[dict[str, str]]:
     data = json.loads(ARTICLES_FILE.read_text(encoding="utf-8"))
     if not isinstance(data, list) or not data:
@@ -64,7 +80,7 @@ def choose_article(articles: list[dict[str, str]]) -> tuple[int, dict[str, str]]
 def main() -> int:
     try:
         token = require_env("TELEGRAM_BOT_TOKEN")
-        chat_id = require_env("TELEGRAM_CHAT_ID")
+        chat_ids = load_chat_ids()
         articles = load_articles()
         index, article = choose_article(articles)
 
@@ -79,8 +95,13 @@ def main() -> int:
             "4. The bot will return TTS parts of at most 3,000 bytes.\n"
             "5. Summarize the article in your own words and speak for 2 minutes."
         )
-        send_message(token, chat_id, message)
-        print(f"Sent article #{index + 1}: {article['title']}")
+        for chat_id in chat_ids:
+            send_message(token, chat_id, message)
+
+        print(
+            f"Sent article #{index + 1} to {len(chat_ids)} chat(s): "
+            f"{article['title']}"
+        )
         return 0
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
